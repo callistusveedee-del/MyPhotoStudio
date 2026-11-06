@@ -1,6 +1,7 @@
 package com.myphotostudio;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.os.Bundle;
 import android.content.Intent;
 import android.net.Uri;
@@ -54,6 +55,12 @@ public class MainActivity extends Activity {
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             startActivityForResult(intent, 100);
         });
+
+        Button cropButton = new Button(this);
+        cropButton.setText("CROP PHOTO");
+        layout.addView(cropButton);
+
+        cropButton.setOnClickListener(v -> showCropOptions());
 
         TextView rotateLabel = new TextView(this);
         rotateLabel.setText("Photo Rotation");
@@ -115,6 +122,86 @@ public class MainActivity extends Activity {
         save.setOnClickListener(v -> savePhoto());
 
         setContentView(layout);
+    }
+
+    void showCropOptions() {
+        if (originalBitmap == null) {
+            Toast.makeText(this, "Choose a photo first",
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] choices = {
+            "Square (1:1)",
+            "Portrait (4:5)",
+            "Landscape (16:9)",
+            "Story (9:16)",
+            "Wide (4:3)"
+        };
+
+        float[] ratios = {
+            1f, 4f / 5f, 16f / 9f, 9f / 16f, 4f / 3f
+        };
+
+        new AlertDialog.Builder(this)
+            .setTitle("Choose Crop Size")
+            .setItems(choices, (dialog, which) -> {
+                applyCrop(ratios[which]);
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    void applyCrop(float targetRatio) {
+        Bitmap edited = createEditedBitmap();
+
+        if (edited == null) return;
+
+        int width = edited.getWidth();
+        int height = edited.getHeight();
+
+        float currentRatio = (float) width / height;
+
+        int cropWidth = width;
+        int cropHeight = height;
+
+        if (currentRatio > targetRatio) {
+            cropWidth = Math.round(height * targetRatio);
+        } else {
+            cropHeight = Math.round(width / targetRatio);
+        }
+
+        int left = (width - cropWidth) / 2;
+        int top = (height - cropHeight) / 2;
+
+        Bitmap cropped = Bitmap.createBitmap(
+            edited, left, top, cropWidth, cropHeight
+        );
+
+        edited.recycle();
+
+        if (rotatedBitmap != null &&
+            rotatedBitmap != originalBitmap) {
+            rotatedBitmap.recycle();
+        }
+
+        if (originalBitmap != null) {
+            originalBitmap.recycle();
+        }
+
+        originalBitmap = cropped;
+        rotatedBitmap = null;
+        rotation = 0;
+
+        brightness.setProgress(100);
+        contrast.setProgress(100);
+
+        updatePhoto();
+
+        status.setText("Crop applied successfully!");
+
+        Toast.makeText(this, "Photo cropped successfully!",
+            Toast.LENGTH_SHORT).show();
     }
 
     void addRotationButton(
