@@ -152,56 +152,84 @@ public class MainActivity extends Activity {
             .show();
     }
 
+
     void applyCrop(float targetRatio) {
         Bitmap edited = createEditedBitmap();
 
         if (edited == null) return;
 
-        int width = edited.getWidth();
-        int height = edited.getHeight();
+        CropSelectionView cropView =
+            new CropSelectionView(this, edited, targetRatio);
 
-        float currentRatio = (float) width / height;
+        int height = (int)(420 *
+            getResources().getDisplayMetrics().density);
 
-        int cropWidth = width;
-        int cropHeight = height;
-
-        if (currentRatio > targetRatio) {
-            cropWidth = Math.round(height * targetRatio);
-        } else {
-            cropHeight = Math.round(width / targetRatio);
-        }
-
-        int left = (width - cropWidth) / 2;
-        int top = (height - cropHeight) / 2;
-
-        Bitmap cropped = Bitmap.createBitmap(
-            edited, left, top, cropWidth, cropHeight
+        cropView.setLayoutParams(
+            new LinearLayout.LayoutParams(-1, height)
         );
 
-        edited.recycle();
+        new AlertDialog.Builder(this)
+            .setTitle("Adjust Your Crop")
+            .setView(cropView)
+            .setNegativeButton("Cancel", (dialog, which) -> {
+                edited.recycle();
+            })
+            .setPositiveButton("Apply Crop", (dialog, which) -> {
+                Rect rect = cropView.getBitmapCropRect();
 
-        if (rotatedBitmap != null &&
-            rotatedBitmap != originalBitmap) {
-            rotatedBitmap.recycle();
-        }
+                if (rect.width() < 1 || rect.height() < 1) {
+                    edited.recycle();
+                    Toast.makeText(this, "Invalid crop area",
+                        Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
-        if (originalBitmap != null) {
-            originalBitmap.recycle();
-        }
+                try {
+                    Bitmap cropped = Bitmap.createBitmap(
+                        edited,
+                        rect.left,
+                        rect.top,
+                        rect.width(),
+                        rect.height()
+                    );
 
-        originalBitmap = cropped;
-        rotatedBitmap = null;
-        rotation = 0;
+                    edited.recycle();
 
-        brightness.setProgress(100);
-        contrast.setProgress(100);
+                    if (rotatedBitmap != null &&
+                        rotatedBitmap != originalBitmap) {
+                        rotatedBitmap.recycle();
+                    }
 
-        updatePhoto();
+                    if (originalBitmap != null) {
+                        originalBitmap.recycle();
+                    }
 
-        status.setText("Crop applied successfully!");
+                    originalBitmap = cropped;
+                    rotatedBitmap = null;
+                    rotation = 0;
 
-        Toast.makeText(this, "Photo cropped successfully!",
-            Toast.LENGTH_SHORT).show();
+                    brightness.setProgress(100);
+                    contrast.setProgress(100);
+
+                    updatePhoto();
+
+                    status.setText("Crop applied successfully!");
+
+                    Toast.makeText(this,
+                        "Photo cropped successfully!",
+                        Toast.LENGTH_SHORT).show();
+
+                } catch (Exception e) {
+                    if (!edited.isRecycled()) {
+                        edited.recycle();
+                    }
+
+                    Toast.makeText(this,
+                        "Cropping failed: " + e.getMessage(),
+                        Toast.LENGTH_LONG).show();
+                }
+            })
+            .show();
     }
 
     void addRotationButton(
