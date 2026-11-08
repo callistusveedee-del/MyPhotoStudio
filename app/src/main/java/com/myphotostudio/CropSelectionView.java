@@ -15,8 +15,8 @@ public class CropSelectionView extends View {
 
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private float downX, downY;
-    private boolean resizing = false;
-
+private boolean resizing = false;
+private int activeCorner = -1;
     public CropSelectionView(Context context, Bitmap bitmap, float ratio) {
         super(context);
         this.bitmap = bitmap;
@@ -113,75 +113,120 @@ public class CropSelectionView extends View {
         canvas.drawCircle(cropRect.right, cropRect.bottom, handle, paint);
     }
 
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        float x = event.getX();
-        float y = event.getY();
+  @Override
+public boolean onTouchEvent(MotionEvent event) {
+    float x = event.getX();
+    float y = event.getY();
 
-        switch (event.getAction()) {
-            case MotionEvent.ACTION_DOWN:
-                downX = x;
-                downY = y;
+    switch (event.getAction()) {
 
-                resizing =
-                    Math.abs(x - cropRect.right) < 45 &&
-                    Math.abs(y - cropRect.bottom) < 45;
+        case MotionEvent.ACTION_DOWN:
+            downX = x;
+            downY = y;
+            activeCorner = -1;
 
-                return true;
+            float handle = 45;
 
-            case MotionEvent.ACTION_MOVE:
-                float dx = x - downX;
-                float dy = y - downY;
+            if (Math.abs(x - cropRect.left) < handle &&
+                Math.abs(y - cropRect.top) < handle) {
+                activeCorner = 0;
+            } else if (Math.abs(x - cropRect.right) < handle &&
+                       Math.abs(y - cropRect.top) < handle) {
+                activeCorner = 1;
+            } else if (Math.abs(x - cropRect.left) < handle &&
+                       Math.abs(y - cropRect.bottom) < handle) {
+                activeCorner = 2;
+            } else if (Math.abs(x - cropRect.right) < handle &&
+                       Math.abs(y - cropRect.bottom) < handle) {
+                activeCorner = 3;
+            }
 
-                if (resizing) {
-                    float newWidth = Math.max(
-                        80, cropRect.width() + dx
-                    );
+            resizing = activeCorner != -1;
+            return true;
 
-                    float newHeight = newWidth / ratio;
+        case MotionEvent.ACTION_MOVE:
 
-                    if (cropRect.left + newWidth > imageRect.right) {
-                        newWidth = imageRect.right - cropRect.left;
-                        newHeight = newWidth / ratio;
-                    }
+            if (resizing) {
 
-                    if (cropRect.top + newHeight > imageRect.bottom) {
-                        newHeight = imageRect.bottom - cropRect.top;
-                        newWidth = newHeight * ratio;
-                    }
+                float anchorX =
+                    (activeCorner == 0 || activeCorner == 2)
+                    ? cropRect.right : cropRect.left;
 
-                    cropRect.right = cropRect.left + newWidth;
-                    cropRect.bottom = cropRect.top + newHeight;
+                float anchorY =
+                    (activeCorner == 0 || activeCorner == 1)
+                    ? cropRect.bottom : cropRect.top;
 
-                } else if (cropRect.contains(downX, downY)) {
-                    float maxX = imageRect.right - cropRect.width();
-                    float maxY = imageRect.bottom - cropRect.height();
+                float sx =
+                    (activeCorner == 0 || activeCorner == 2)
+                    ? -1 : 1;
 
-                    float left = Math.max(
-                        imageRect.left,
-                        Math.min(maxX, cropRect.left + dx)
-                    );
+                float sy =
+                    (activeCorner == 0 || activeCorner == 1)
+                    ? -1 : 1;
 
-                    float top = Math.max(
-                        imageRect.top,
-                        Math.min(maxY, cropRect.top + dy)
-                    );
+                float maxW = sx < 0
+                    ? anchorX - imageRect.left
+                    : imageRect.right - anchorX;
 
-                    cropRect.offsetTo(left, top);
-                }
+                float maxH = sy < 0
+                    ? anchorY - imageRect.top
+                    : imageRect.bottom - anchorY;
 
-                downX = x;
-                downY = y;
-                invalidate();
-                return true;
+                float maxWidth = Math.min(maxW, maxH * ratio);
 
-            case MotionEvent.ACTION_UP:
-                return true;
-        }
+                float width = Math.min(
+                    maxWidth,
+                    Math.max(40,
+                        Math.max(
+                            Math.abs(x - anchorX),
+                            Math.abs(y - anchorY) * ratio
+                        )
+                    )
+                );
 
-        return true;
+                float height = width / ratio;
+
+                cropRect.set(
+                    sx < 0 ? anchorX - width : anchorX,
+                    sy < 0 ? anchorY - height : anchorY,
+                    sx < 0 ? anchorX : anchorX + width,
+                    sy < 0 ? anchorY : anchorY + height
+                );
+
+            } else if (cropRect.contains(downX, downY)) {
+
+                float left = Math.max(
+                    imageRect.left,
+                    Math.min(
+                        imageRect.right - cropRect.width(),
+                        cropRect.left + x - downX
+                    )
+                );
+
+                float top = Math.max(
+                    imageRect.top,
+                    Math.min(
+                        imageRect.bottom - cropRect.height(),
+                        cropRect.top + y - downY
+                    )
+                );
+
+                cropRect.offsetTo(left, top);
+            }
+
+            downX = x;
+            downY = y;
+            invalidate();
+            return true;
+
+        case MotionEvent.ACTION_UP:
+            resizing = false;
+            activeCorner = -1;
+            return true;
     }
 
+    return true;
+}
     public Rect getBitmapCropRect() {
         float sx = bitmap.getWidth() / imageRect.width();
         float sy = bitmap.getHeight() / imageRect.height();

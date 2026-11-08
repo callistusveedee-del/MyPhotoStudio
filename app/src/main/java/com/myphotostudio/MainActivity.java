@@ -20,7 +20,13 @@ public class MainActivity extends Activity {
     Bitmap pendingSaveBitmap;
 
     int rotation = 0;
+boolean flipHorizontal = false;
+boolean flipVertical = false;
 
+java.util.ArrayList<Bitmap> editHistory =
+    new java.util.ArrayList<>();
+
+int historyIndex = -1;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -186,13 +192,12 @@ public class MainActivity extends Activity {
 
                 try {
                     Bitmap cropped = Bitmap.createBitmap(
-                        edited,
-                        rect.left,
-                        rect.top,
-                        rect.width(),
-                        rect.height()
-                    );
-
+    edited,
+    rect.left,
+    rect.top,
+    rect.width(),
+    rect.height()
+).copy(Bitmap.Config.ARGB_8888, true);
                     edited.recycle();
 
                     if (rotatedBitmap != null &&
