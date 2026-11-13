@@ -131,35 +131,16 @@ int historyIndex = -1;
     }
 
     void showCropOptions() {
-    if (originalBitmap == null) {
-        Toast.makeText(this, "Choose a photo first",
-            Toast.LENGTH_SHORT).show();
-        return;
+        if (originalBitmap == null) {
+            Toast.makeText(this, "Choose a photo first",
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        applyCrop();
     }
 
-    applyCrop();
-}
-        String[] choices = {
-            "Square (1:1)",
-            "Portrait (4:5)",
-            "Landscape (16:9)",
-            "Story (9:16)",
-            "Wide (4:3)"
-        };
-
-        float[] ratios = {
-            1f, 4f / 5f, 16f / 9f, 9f / 16f, 4f / 3f
-        };
-
-        new AlertDialog.Builder(this)
-            .setTitle("Choose Crop Size")
-            .setItems(choices, (dialog, which) -> {
-                applyCrop(ratios[which]);
-           })
-            .setNegativeButton("Cancel", null)
-            .show();
-    }
-        void applyCrop() {
+    void applyCrop() {
         Bitmap edited = createEditedBitmap();
 
         if (edited == null) return;
