@@ -131,12 +131,14 @@ int historyIndex = -1;
     }
 
     void showCropOptions() {
-        if (originalBitmap == null) {
-            Toast.makeText(this, "Choose a photo first",
-                Toast.LENGTH_SHORT).show();
-            return;
-        }
+    if (originalBitmap == null) {
+        Toast.makeText(this, "Choose a photo first",
+            Toast.LENGTH_SHORT).show();
+        return;
+    }
 
+    applyCrop();
+}
         String[] choices = {
             "Square (1:1)",
             "Portrait (4:5)",
@@ -153,20 +155,17 @@ int historyIndex = -1;
             .setTitle("Choose Crop Size")
             .setItems(choices, (dialog, which) -> {
                 applyCrop(ratios[which]);
-            })
+           })
             .setNegativeButton("Cancel", null)
             .show();
     }
-
-
-    void applyCrop(float targetRatio) {
+        void applyCrop() {
         Bitmap edited = createEditedBitmap();
 
         if (edited == null) return;
 
         CropSelectionView cropView =
-            new CropSelectionView(this, edited, targetRatio);
-
+            new CropSelectionView(this, edited);
         int height = (int)(420 *
             getResources().getDisplayMetrics().density);
 
