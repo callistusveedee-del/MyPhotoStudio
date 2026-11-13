@@ -1,441 +1,723 @@
+
 package com.myphotostudio;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.os.Bundle;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
-import android.graphics.*;
-import android.widget.*;
 import android.view.Gravity;
+import android.view.View;
+import android.widget.*;
 
 public class MainActivity extends Activity {
 
-    ImageView photo;
-    SeekBar brightness, contrast;
-    TextView status;
+    LinearLayout mainLayout, content;
+    SharedPreferences prefs;
 
-    Bitmap originalBitmap;
-    Bitmap rotatedBitmap;
-    Bitmap pendingSaveBitmap;
+    String selectedTemplate = "Faceless Video";
+    String selectedVideo = "";
 
-    int rotation = 0;
-boolean flipHorizontal = false;
-boolean flipVertical = false;
+    EditText promptInput, scriptInput;
+    Spinner durationSpinner, ratioSpinner;
 
-java.util.ArrayList<Bitmap> editHistory =
-    new java.util.ArrayList<>();
+    int bg = Color.rgb(15, 17, 27);
+    int card = Color.rgb(29, 33, 48);
+    int accent = Color.rgb(115, 85, 255);
+    int white = Color.WHITE;
+    int muted = Color.rgb(175, 180, 195);
 
-int historyIndex = -1;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(16, 12, 16, 12);
-        layout.setBackgroundColor(Color.rgb(245,245,250));
+        prefs = getSharedPreferences("MyStudio", MODE_PRIVATE);
 
-        TextView title = new TextView(this);
-        title.setText("MyPhotoStudio");
-        title.setTextSize(27);
-        title.setTextColor(Color.BLACK);
-        title.setGravity(Gravity.CENTER);
-        layout.addView(title);
+        getWindow().setStatusBarColor(bg);
+        getWindow().setNavigationBarColor(bg);
 
-        photo = new ImageView(this);
-        photo.setBackgroundColor(Color.LTGRAY);
-        photo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-
-        layout.addView(photo, new LinearLayout.LayoutParams(
-            -1, 0, 1
-        ));
-
-        Button choose = new Button(this);
-        choose.setText("Choose Photo");
-        layout.addView(choose);
-
-        choose.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-            intent.setType("image/*");
-            intent.addCategory(Intent.CATEGORY_OPENABLE);
-            startActivityForResult(intent, 100);
-        });
-
-        Button cropButton = new Button(this);
-        cropButton.setText("CROP PHOTO");
-        layout.addView(cropButton);
-
-        cropButton.setOnClickListener(v -> showCropOptions());
-
-        TextView rotateLabel = new TextView(this);
-        rotateLabel.setText("Photo Rotation");
-        rotateLabel.setTextColor(Color.BLACK);
-        rotateLabel.setTextSize(17);
-        layout.addView(rotateLabel);
-
-        LinearLayout rotateRow = new LinearLayout(this);
-        rotateRow.setOrientation(LinearLayout.HORIZONTAL);
-
-        addRotationButton(rotateRow, "90°", 90);
-        addRotationButton(rotateRow, "180°", 180);
-        addRotationButton(rotateRow, "270°", 270);
-
-        Button reset = new Button(this);
-        reset.setText("Reset");
-        rotateRow.addView(reset,
-            new LinearLayout.LayoutParams(0, -2, 1));
-
-        reset.setOnClickListener(v -> {
-            rotation = 0;
-            updatePhoto();
-        });
-
-        layout.addView(rotateRow);
-
-        TextView brightnessLabel = new TextView(this);
-        brightnessLabel.setText("Brightness");
-        brightnessLabel.setTextColor(Color.BLACK);
-        layout.addView(brightnessLabel);
-
-        brightness = new SeekBar(this);
-        brightness.setMax(200);
-        brightness.setProgress(100);
-        layout.addView(brightness);
-
-        TextView contrastLabel = new TextView(this);
-        contrastLabel.setText("Contrast");
-        contrastLabel.setTextColor(Color.BLACK);
-        layout.addView(contrastLabel);
-
-        contrast = new SeekBar(this);
-        contrast.setMax(200);
-        contrast.setProgress(100);
-        layout.addView(contrast);
-
-        brightness.setOnSeekBarChangeListener(listener());
-        contrast.setOnSeekBarChangeListener(listener());
-
-        status = new TextView(this);
-        status.setText("Choose a photo to start editing");
-        status.setTextColor(Color.DKGRAY);
-        status.setGravity(Gravity.CENTER);
-        layout.addView(status);
-
-        Button save = new Button(this);
-        save.setText("Save Edited Photo");
-        layout.addView(save);
-        save.setOnClickListener(v -> savePhoto());
-
-        setContentView(layout);
+        buildApp();
+        showHome();
     }
 
-    void showCropOptions() {
-        if (originalBitmap == null) {
-            Toast.makeText(this, "Choose a photo first",
+    int dp(float value) {
+        return (int) (value *
+            getResources().getDisplayMetrics().density);
+    }
+
+    GradientDrawable shape(int color, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radius));
+        return drawable;
+    }
+
+    TextView text(String value, int size, int color,
+                  boolean bold) {
+
+        TextView t = new TextView(this);
+        t.setText(value);
+        t.setTextSize(size);
+        t.setTextColor(color);
+        t.setGravity(Gravity.CENTER_VERTICAL);
+
+        if (bold) {
+            t.setTypeface(null, Typeface.BOLD);
+        }
+
+        return t;
+    }
+
+    void buildApp() {
+
+        mainLayout = new LinearLayout(this);
+        mainLayout.setOrientation(LinearLayout.VERTICAL);
+        mainLayout.setBackgroundColor(bg);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.VERTICAL);
+        header.setPadding(dp(18), dp(15), dp(18), dp(12));
+
+        TextView logo = text("MY PHOTO STUDIO", 23,
+                             white, true);
+
+        TextView subtitle = text(
+            "AI VIDEO CREATOR  •  EDITOR",
+            11, muted, true
+        );
+
+        header.addView(logo);
+        header.addView(subtitle);
+
+        mainLayout.addView(header);
+
+        HorizontalScrollView navScroll =
+            new HorizontalScrollView(this);
+
+        navScroll.setHorizontalScrollBarEnabled(false);
+
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setPadding(dp(10), dp(5), dp(10), dp(10));
+
+        String[] names = {
+            "Home", "Create", "Shorts",
+            "Templates", "Projects", "Settings"
+        };
+
+        for (String name : names) {
+            Button b = new Button(this);
+            b.setText(name);
+            b.setTextSize(11);
+            b.setTextColor(white);
+            b.setAllCaps(false);
+            b.setBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(card)
+            );
+
+            b.setOnClickListener(v -> navigate(name));
+
+            nav.addView(b, new LinearLayout.LayoutParams(
+                dp(95), dp(45)
+            ));
+        }
+
+        navScroll.addView(nav);
+        mainLayout.addView(navScroll);
+
+        ScrollView scroll = new ScrollView(this);
+
+        content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(10), dp(16), dp(25));
+
+        scroll.addView(content);
+
+        mainLayout.addView(scroll,
+            new LinearLayout.LayoutParams(
+                -1, 0, 1
+            )
+        );
+
+        setContentView(mainLayout);
+    }
+
+    void navigate(String page) {
+
+        switch (page) {
+
+            case "Home":
+                showHome();
+                break;
+
+            case "Create":
+                showCreate();
+                break;
+
+            case "Shorts":
+                showShorts();
+                break;
+
+            case "Templates":
+                showTemplates();
+                break;
+
+            case "Projects":
+                showProjects();
+                break;
+
+            case "Settings":
+                showSettings();
+                break;
+        }
+    }
+
+    LinearLayout newPage(String title, String description) {
+
+        content.removeAllViews();
+
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+
+        page.addView(text(title, 25, white, true));
+
+        TextView desc = text(description, 13, muted, false);
+        desc.setPadding(0, dp(5), 0, dp(18));
+
+        page.addView(desc);
+        content.addView(page);
+
+        return page;
+    }
+
+    LinearLayout addCard(LinearLayout parent,
+                         String title, String description) {
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16), dp(15), dp(16), dp(15));
+        box.setBackground(shape(card, 17));
+
+        LinearLayout.LayoutParams params =
+            new LinearLayout.LayoutParams(-1, -2);
+
+        params.bottomMargin = dp(12);
+
+        parent.addView(box, params);
+
+        box.addView(text(title, 17, white, true));
+
+        TextView desc = text(description, 13, muted, false);
+        desc.setPadding(0, dp(7), 0, 0);
+
+        box.addView(desc);
+
+        return box;
+    }
+
+    Button addButton(LinearLayout parent, String label,
+                     Runnable action) {
+
+        Button button = new Button(this);
+
+        button.setText(label);
+        button.setTextSize(13);
+        button.setAllCaps(false);
+        button.setTextColor(white);
+
+        button.setBackgroundTintList(
+            android.content.res.ColorStateList.valueOf(accent)
+        );
+
+        LinearLayout.LayoutParams params =
+            new LinearLayout.LayoutParams(-1, dp(50));
+
+        params.topMargin = dp(8);
+        params.bottomMargin = dp(8);
+
+        parent.addView(button, params);
+
+        button.setOnClickListener(v -> action.run());
+
+        return button;
+    }
+
+    void showHome() {
+
+        LinearLayout page = newPage(
+            "Create something amazing",
+            "Your AI-powered video creation studio."
+        );
+
+        LinearLayout banner = addCard(
+            page,
+            "YOUR VIDEO STUDIO",
+            "Turn your ideas, scripts and stories into engaging videos."
+        );
+
+        banner.addView(text(
+            "TEXT → SCRIPT → VIDEO → EXPORT",
+            13, white, true
+        ));
+
+        addButton(page, "＋  Create New AI Video",
+            () -> showCreate());
+
+        addCard(page,
+            "AI Script Writer",
+            "Turn a simple idea into a complete video script."
+        );
+
+        addButton(page, "Write a Script",
+            () -> showCreate());
+
+        addCard(page,
+            "Long Video to Shorts",
+            "Prepare long videos for vertical social media clips."
+        );
+
+        addButton(page, "Create Shorts",
+            () -> showShorts());
+
+        addCard(page,
+            "AI Voiceover",
+            "Plan narration, voice selection and language options."
+        );
+
+        addCard(page,
+            "Automatic Captions",
+            "Prepare subtitles and caption styles for your videos."
+        );
+
+        addCard(page,
+            "Video Templates",
+            "Faceless videos, advertisements, explainers and stories."
+        );
+
+        addButton(page, "Explore Templates",
+            () -> showTemplates());
+
+        addCard(page,
+            "My Projects",
+            "Continue working on your saved video ideas."
+        );
+
+        addButton(page, "Open Projects",
+            () -> showProjects());
+    }
+
+    void showCreate() {
+
+        LinearLayout page = newPage(
+            "AI Video Generator",
+            "Describe your idea or paste your complete script."
+        );
+
+        LinearLayout promptCard = addCard(
+            page,
+            "1. Describe your video",
+            "What video do you want to create?"
+        );
+
+        promptInput = new EditText(this);
+        promptInput.setTextColor(white);
+        promptInput.setHintTextColor(muted);
+        promptInput.setHint(
+            "Example: Create an African folktale about a mysterious village..."
+        );
+        promptInput.setGravity(Gravity.TOP);
+        promptInput.setMinLines(4);
+        promptInput.setPadding(dp(12), dp(12), dp(12), dp(12));
+        promptInput.setBackground(shape(
+            Color.rgb(43, 47, 64), 12
+        ));
+
+        promptCard.addView(promptInput);
+
+        LinearLayout scriptCard = addCard(
+            page,
+            "2. Full video script",
+            "Paste your script here or write your own."
+        );
+
+        scriptInput = new EditText(this);
+        scriptInput.setTextColor(white);
+        scriptInput.setHintTextColor(muted);
+        scriptInput.setHint("Enter your video script...");
+        scriptInput.setGravity(Gravity.TOP);
+        scriptInput.setMinLines(5);
+        scriptInput.setPadding(dp(12), dp(12), dp(12), dp(12));
+        scriptInput.setBackground(shape(
+            Color.rgb(43, 47, 64), 12
+        ));
+
+        scriptCard.addView(scriptInput);
+
+        LinearLayout options = addCard(
+            page,
+            "3. Video settings",
+            "Choose your preferred video format."
+        );
+
+        addLabel(options, "Video duration");
+
+        durationSpinner = addSpinner(options,
+            new String[]{
+                "30 seconds", "1 minute",
+                "3 minutes", "5 minutes", "10 minutes"
+            });
+
+        addLabel(options, "Aspect ratio");
+
+        ratioSpinner = addSpinner(options,
+            new String[]{
+                "9:16 - TikTok / Reels / Shorts",
+                "16:9 - YouTube",
+                "1:1 - Square"
+            });
+
+        addLabel(options, "Selected template");
+
+        TextView template = text(
+            selectedTemplate, 15, white, true
+        );
+
+        options.addView(template);
+
+        addButton(page, "Choose Template",
+            () -> showTemplates());
+
+        addButton(page, "Prepare Video Project",
+            () -> saveProject());
+
+        addCard(page,
+            "AI generation connection",
+            "Video generation, AI narration, stock footage and automatic captions will become available after connecting the AI services."
+        );
+    }
+
+    void addLabel(LinearLayout parent, String label) {
+
+        TextView t = text(label, 13, muted, true);
+        t.setPadding(0, dp(12), 0, dp(5));
+
+        parent.addView(t);
+    }
+
+    Spinner addSpinner(LinearLayout parent, String[] items) {
+
+        Spinner spinner = new Spinner(this);
+
+        ArrayAdapter<String> adapter =
+            new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                items
+            );
+
+        adapter.setDropDownViewResource(
+            android.R.layout.simple_spinner_dropdown_item
+        );
+
+        spinner.setAdapter(adapter);
+
+        parent.addView(spinner);
+
+        return spinner;
+    }
+
+    void saveProject() {
+
+        String prompt = promptInput.getText().toString().trim();
+        String script = scriptInput.getText().toString().trim();
+
+        if (prompt.isEmpty() && script.isEmpty()) {
+
+            Toast.makeText(this,
+                "Enter a video idea or script first.",
                 Toast.LENGTH_SHORT).show();
+
             return;
         }
 
-        applyCrop();
-    }
+        SharedPreferences.Editor editor = prefs.edit();
 
-    void applyCrop() {
-        Bitmap edited = createEditedBitmap();
+        editor.putString("last_prompt", prompt);
+        editor.putString("last_script", script);
+        editor.putString("last_template", selectedTemplate);
 
-        if (edited == null) return;
+        editor.putString("last_duration",
+            durationSpinner.getSelectedItem().toString());
 
-        CropSelectionView cropView =
-            new CropSelectionView(this, edited);
-        int height = (int)(420 *
-            getResources().getDisplayMetrics().density);
+        editor.putString("last_ratio",
+            ratioSpinner.getSelectedItem().toString());
 
-        cropView.setLayoutParams(
-            new LinearLayout.LayoutParams(-1, height)
-        );
+        editor.putLong("last_saved", System.currentTimeMillis());
 
-        new AlertDialog.Builder(this)
-            .setTitle("Adjust Your Crop")
-            .setView(cropView)
-            .setNegativeButton("Cancel", (dialog, which) -> {
-                edited.recycle();
-            })
-            .setPositiveButton("Apply Crop", (dialog, which) -> {
-                Rect rect = cropView.getBitmapCropRect();
+        editor.apply();
 
-                if (rect.width() < 1 || rect.height() < 1) {
-                    edited.recycle();
-                    Toast.makeText(this, "Invalid crop area",
-                        Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                try {
-                    Bitmap cropped = Bitmap.createBitmap(
-    edited,
-    rect.left,
-    rect.top,
-    rect.width(),
-    rect.height()
-).copy(Bitmap.Config.ARGB_8888, true);
-                    edited.recycle();
-
-                    if (rotatedBitmap != null &&
-                        rotatedBitmap != originalBitmap) {
-                        rotatedBitmap.recycle();
-                    }
-
-                    if (originalBitmap != null) {
-                        originalBitmap.recycle();
-                    }
-
-                    originalBitmap = cropped;
-                    rotatedBitmap = null;
-                    rotation = 0;
-
-                    brightness.setProgress(100);
-                    contrast.setProgress(100);
-
-                    updatePhoto();
-
-                    status.setText("Crop applied successfully!");
-
-                    Toast.makeText(this,
-                        "Photo cropped successfully!",
-                        Toast.LENGTH_SHORT).show();
-
-                } catch (Exception e) {
-                    if (!edited.isRecycled()) {
-                        edited.recycle();
-                    }
-
-                    Toast.makeText(this,
-                        "Cropping failed: " + e.getMessage(),
-                        Toast.LENGTH_LONG).show();
-                }
-            })
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Project saved")
+            .setMessage(
+                "Your video project draft has been saved.\n\n" +
+                "The next development step is connecting the AI " +
+                "generation service to create the actual video."
+            )
+            .setPositiveButton("OK", (d, w) -> showProjects())
             .show();
     }
 
-    void addRotationButton(
-        LinearLayout row, String text, int degrees) {
+    void showTemplates() {
 
-        Button button = new Button(this);
-        button.setText(text);
+        LinearLayout page = newPage(
+            "Video Templates",
+            "Choose a workflow for your next creation."
+        );
 
-        row.addView(button,
-            new LinearLayout.LayoutParams(0, -2, 1));
+        String[][] templates = {
+            {"Faceless Video",
+             "Create narration-based videos with visuals."},
 
-        button.setOnClickListener(v -> {
-            rotation = (rotation + degrees) % 360;
-            updatePhoto();
-        });
-    }
+            {"African Storytelling",
+             "Folktales, characters and cinematic storytelling."},
 
-    SeekBar.OnSeekBarChangeListener listener() {
-        return new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(
-                SeekBar s, int progress, boolean fromUser) {
-                updatePhoto();
-            }
+            {"YouTube Explainer",
+             "Educational videos and informative content."},
 
-            public void onStartTrackingTouch(SeekBar s) {}
-            public void onStopTrackingTouch(SeekBar s) {}
+            {"Marketing Advertisement",
+             "Product promotions and advertising videos."},
+
+            {"Podcast Clips",
+             "Short clips from longer discussions."},
+
+            {"News Style",
+             "News presentation and informational videos."},
+
+            {"Motivational Video",
+             "Motivational scripts, narration and captions."},
+
+            {"Animation",
+             "Animated storytelling and visual scenes."}
         };
-    }
 
-    Bitmap rotateBitmap(Bitmap source, int degrees) {
-        if (source == null || degrees == 0) return source;
+        for (String[] item : templates) {
 
-        Matrix matrix = new Matrix();
-        matrix.postRotate(degrees);
+            LinearLayout box = addCard(
+                page, item[0], item[1]
+            );
 
-        return Bitmap.createBitmap(
-            source, 0, 0,
-            source.getWidth(), source.getHeight(),
-            matrix, true
-        );
-    }
+            addButton(box, "Select Template",
+                () -> {
 
-    ColorMatrix getColorMatrix() {
-        float b = brightness.getProgress() - 100;
-        float c = contrast.getProgress() / 100f;
-        float offset = 128 * (1 - c) + b;
+                    selectedTemplate = item[0];
 
-        return new ColorMatrix(new float[] {
-            c,0,0,0,offset,
-            0,c,0,0,offset,
-            0,0,c,0,offset,
-            0,0,0,1,0
-        });
-    }
+                    Toast.makeText(this,
+                        item[0] + " selected",
+                        Toast.LENGTH_SHORT).show();
 
-    void updatePhoto() {
-        if (originalBitmap == null) return;
-
-        if (rotatedBitmap != null &&
-            rotatedBitmap != originalBitmap) {
-            rotatedBitmap.recycle();
+                    showCreate();
+                });
         }
-
-        rotatedBitmap = rotateBitmap(originalBitmap, rotation);
-        photo.setImageBitmap(rotatedBitmap);
-
-        photo.setColorFilter(
-            new ColorMatrixColorFilter(getColorMatrix())
-        );
-
-        status.setText("Editing photo...");
     }
 
-    Bitmap createEditedBitmap() {
-        if (originalBitmap == null) return null;
+    void showShorts() {
 
-        Bitmap rotated = rotateBitmap(originalBitmap, rotation);
-
-        Bitmap result = Bitmap.createBitmap(
-            rotated.getWidth(),
-            rotated.getHeight(),
-            Bitmap.Config.ARGB_8888
+        LinearLayout page = newPage(
+            "Long Video to Shorts",
+            "Prepare your long videos for short-form editing."
         );
 
-        Canvas canvas = new Canvas(result);
-        Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
-
-        paint.setColorFilter(
-            new ColorMatrixColorFilter(getColorMatrix())
+        LinearLayout box = addCard(
+            page,
+            "Select a source video",
+            "Choose a video from your phone."
         );
 
-        canvas.drawBitmap(rotated, 0, 0, paint);
+        addButton(box, "Choose Video",
+            () -> chooseVideo());
 
-        if (rotated != originalBitmap) {
-            rotated.recycle();
-        }
+        addCard(page,
+            "AI Context Analysis",
+            "Identify interesting moments, important ideas and strong hooks."
+        );
 
-        return result;
+        addCard(page,
+            "Automatic Clip Selection",
+            "Prepare short video segments from your source video."
+        );
+
+        addCard(page,
+            "Smart Reframing",
+            "Plan 9:16 vertical, 1:1 square and 16:9 landscape formats."
+        );
+
+        addCard(page,
+            "Dynamic Captions",
+            "Plan animated subtitles and highlighted keywords."
+        );
+
+        addCard(page,
+            "Silence Removal",
+            "Prepare automatic pause and filler-word removal."
+        );
+
+        addButton(page, "Prepare Shorts Project",
+            () -> {
+
+                if (selectedVideo.isEmpty()) {
+
+                    Toast.makeText(this,
+                        "Choose a video first.",
+                        Toast.LENGTH_SHORT).show();
+
+                    return;
+                }
+
+                Toast.makeText(this,
+                    "Video selected. AI clipping service still needs connection.",
+                    Toast.LENGTH_LONG).show();
+            });
     }
 
-    void savePhoto() {
-        if (originalBitmap == null) {
-            Toast.makeText(this, "Choose a photo first",
-                Toast.LENGTH_SHORT).show();
-            return;
-        }
+    void chooseVideo() {
 
-        pendingSaveBitmap = createEditedBitmap();
+        Intent intent = new Intent(
+            Intent.ACTION_OPEN_DOCUMENT
+        );
 
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.setType("video/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("image/jpeg");
-        intent.putExtra(Intent.EXTRA_TITLE, "MyPhotoStudio_Edit.jpg");
 
         startActivityForResult(intent, 101);
     }
 
-    Bitmap loadImage(Uri uri) throws Exception {
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inJustDecodeBounds = true;
+    @Override
+    protected void onActivityResult(int requestCode,
+                                   int resultCode,
+                                   Intent data) {
 
-        java.io.InputStream stream =
-            getContentResolver().openInputStream(uri);
+        super.onActivityResult(
+            requestCode, resultCode, data
+        );
 
-        BitmapFactory.decodeStream(stream, null, options);
-        stream.close();
+        if (requestCode == 101 &&
+            resultCode == RESULT_OK &&
+            data != null) {
 
-        int sample = 1;
+            Uri uri = data.getData();
 
-        while (options.outWidth / sample > 2048 ||
-               options.outHeight / sample > 2048) {
-            sample *= 2;
+            if (uri != null) {
+
+                selectedVideo = uri.toString();
+
+                getContentResolver().takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                );
+
+                Toast.makeText(this,
+                    "Video selected successfully.",
+                    Toast.LENGTH_SHORT).show();
+            }
         }
-
-        BitmapFactory.Options finalOptions =
-            new BitmapFactory.Options();
-        finalOptions.inSampleSize = sample;
-
-        stream = getContentResolver().openInputStream(uri);
-        Bitmap bitmap = BitmapFactory.decodeStream(
-            stream, null, finalOptions);
-        stream.close();
-
-        return bitmap;
     }
 
-    @Override
-    protected void onActivityResult(
-        int requestCode, int resultCode, Intent data) {
+    void showProjects() {
 
-        super.onActivityResult(requestCode, resultCode, data);
+        LinearLayout page = newPage(
+            "My Projects",
+            "Your saved video creation projects."
+        );
 
-        if (resultCode != RESULT_OK || data == null) {
-            if (requestCode == 101 && pendingSaveBitmap != null) {
-                pendingSaveBitmap.recycle();
-                pendingSaveBitmap = null;
-            }
+        String prompt = prefs.getString(
+            "last_prompt", ""
+        );
+
+        String script = prefs.getString(
+            "last_script", ""
+        );
+
+        String template = prefs.getString(
+            "last_template", ""
+        );
+
+        if (prompt.isEmpty() && script.isEmpty()) {
+
+            addCard(page,
+                "No saved projects yet",
+                "Start by creating your first video project."
+            );
+
+            addButton(page, "Create First Project",
+                () -> showCreate());
+
             return;
         }
 
-        if (requestCode == 100) {
-            try {
-                Bitmap loaded = loadImage(data.getData());
+        LinearLayout project = addCard(
+            page,
+            "Latest Video Project",
+            "Template: " + template
+        );
 
-                if (loaded == null) {
-                    throw new Exception("Unable to decode image");
-                }
+        project.addView(text(
+            "Idea: " + prompt,
+            13, muted, false
+        ));
 
-                if (rotatedBitmap != null &&
-                    rotatedBitmap != originalBitmap) {
-                    rotatedBitmap.recycle();
-                }
+        project.addView(text(
+            "Script: " + script,
+            13, muted, false
+        ));
 
-                if (originalBitmap != null) {
-                    originalBitmap.recycle();
-                }
+        addButton(page, "Continue Editing",
+            () -> {
 
-                originalBitmap = loaded;
-                rotatedBitmap = null;
-                rotation = 0;
+                showCreate();
 
-                brightness.setProgress(100);
-                contrast.setProgress(100);
+                promptInput.setText(prompt);
+                scriptInput.setText(script);
+            });
+    }
 
-                updatePhoto();
-                status.setText("Photo loaded successfully!");
+    void showSettings() {
 
-            } catch (Exception e) {
-                status.setText("Unable to load photo");
-                Toast.makeText(this, e.getMessage(),
-                    Toast.LENGTH_LONG).show();
-            }
-        }
+        LinearLayout page = newPage(
+            "Settings",
+            "Manage your video studio."
+        );
 
-        if (requestCode == 101 && pendingSaveBitmap != null) {
-            try {
-                java.io.OutputStream output =
-                    getContentResolver().openOutputStream(
-                        data.getData());
+        addCard(page,
+            "App Information",
+            "MyPhotoStudio AI Video Creator"
+        );
 
-                if (output == null) {
-                    throw new Exception("Cannot open save location");
-                }
+        addCard(page,
+            "AI Services",
+            "Connect video generation, AI voice, captions and stock media services."
+        );
 
-                pendingSaveBitmap.compress(
-                    Bitmap.CompressFormat.JPEG, 95, output);
+        addCard(page,
+            "Languages",
+            "Prepare multilingual narration and subtitles."
+        );
 
-                output.close();
+        addCard(page,
+            "Export Settings",
+            "Configure MP4 video output, aspect ratio and quality."
+        );
 
-                Toast.makeText(this, "Photo saved successfully!",
-                    Toast.LENGTH_LONG).show();
+        addCard(page,
+            "Account",
+            "Account and cloud project features can be added later."
+        );
 
-                status.setText("Edited photo saved!");
-
-            } catch (Exception e) {
-                Toast.makeText(this, "Save failed: " + e.getMessage(),
-                    Toast.LENGTH_LONG).show();
-            } finally {
-                pendingSaveBitmap.recycle();
-                pendingSaveBitmap = null;
-            }
-        }
+        addCard(page,
+            "Version",
+            "MyPhotoStudio AI Video Studio - Version 2.0"
+        );
     }
 }
